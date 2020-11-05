@@ -1,6 +1,13 @@
 import torch
 import numpy
 from numpy import linalg
+import argparse 
+import tensorly 
+
+parser = argparse.ArgumentParser(description='filter selection for efficient net') 
+parser.add_argument('--scoring', '-s', type=int, default=0)
+parser.add_argument('--save_name', '-n', type=str, default='pruned_model') 
+args = parser.parse_args() 
 
 #load model 
 model = torch.load('trained_model')  
@@ -45,15 +52,23 @@ def rd_conv_pruning(rd_conv, prune_list):
     return pruned_rd_conv
 
 
-def get_prune_list(conv,cut_off_rate):
+def get_prune_list(conv,next_conv,cut_off_rate):
     importance_list = numpy.array([])
     weight = conv.weight.data.cpu().numpy() 
     for i in range(conv.out_channels):
         weight_matrix = weight[i,:,:,:].squeeze()
-        importance_list=numpy.append(importance_list, numpy.linalg.norm(weight_matrix,'nuc'))
-    prune_list = sorted(range(len(importance_list)),key=lambda i: importance_list[i])[:int(conv.out_channels*cut_off_rate)] 
+        if args.scoring == 0:
+            importance_list = numpy.append(importance_list, numpy.linalg.norm(weight_matrix, 'nuc')) 
+        if args.scoring == 1:
+            weight_next = next_conv.weight.data.cpu().numpy().squeeze()
+            target_tensor = tensorly.tenalg.mode_dot(weight.squeeze(), weight_next, 0) 
+            pruned_weight_next = numpy.delete(weight_next, [i], 1) 
+            pruned_weight = numpy.delete(weight.squeeze(), [i], 0)
+            pruned_tensor = tensorly.tenalg.mode_dot(pruned_weight, pruned_weight_next, 0)
+            score = tensorly.norm(target_tensor = pruned_tensor)
+            importance_list = numpy.append(importance_list, score * -1.0) 
+        prune_list = sorted(range(len(importance_list)),key=lambda i: importance_list[i])[:int(conv.out_channels*cut_off_rate)] 
     return prune_list
-
 
 blocks = range(2,23)
 
@@ -70,22 +85,21 @@ for i in blocks:
     print(ex_conv.weight.data.size())
     print(dw_conv.weight.data.size())
     print(se_rd_conv.weight.data.size())
-    print(se_ex_conv.weight.data.size())
-    print(rd_conv.weight.data.size())
+    #print(se_ex_conv.weight.data.size())
+    #print(rd_conv.weight.data.size())
     print("-------------------------------------") 
     pruned_ex_conv = ex_conv_pruning(ex_conv, prune_list)
     pruned_dw_conv = dw_conv_pruning(dw_conv, prune_list)
-    pruned_rd_conv = rd_conv_pruning(rd_conv, prune_list) 
+    pruned_rd_conv = rd_conv_pruning(se_rd_conv, prune_list) 
     print(pruned_ex_conv.weight.data.size()) 
     print(pruned_dw_conv.weight.data.size())
-    print(pruned_rd_conv.weight.data.size())
+    print(pruned_se_rd_conv.weight.data.size())
     print("-------------------------------------")
 
     model._modules['backbone_net']._modules['model']._modules['_blocks']._modules[str(i)]._modules['_expand_conv']._modules['conv'] = pruned_ex_conv
     model._modules['backbone_net']._modules['model']._modules['_blocks']._modules[str(i)]._modules['_depthwise_conv']._modules['conv'] = pruned_dw_conv
-    model._modules['backbone_net']._modules['model']._modules['_blocks']._modules[str(i)]._modules['_se_reduce']._modules['conv'] = pruned_rd_conv
+    model._modules['backbone_net']._modules['model']._modules['_blocks']._modules[str(i)]._modules['_se_reduce']._modules['conv'] = pruned_se_rd_conv
 
-
-torch.save(model, "pruned_model")
+torch.save(model, args.save_name)
 print(sum(p.numel()  for p in model.parameters() if p.requires_grad))
 
