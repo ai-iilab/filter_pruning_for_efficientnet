@@ -9,9 +9,6 @@ parser.add_argument('--scoring', '-s', type=int, default=0)
 parser.add_argument('--save_name', '-n', type=str, default='pruned_model') 
 args = parser.parse_args() 
 
-#load model 
-model = torch.load('trained_model')  
-print(sum(p.numel()  for p in model.parameters() if p.requires_grad)) 
 
 def ex_conv_pruning(ex_conv, prune_list):
     pruned_ex_conv = torch.nn.Conv2d(in_channels = ex_conv.in_channels, out_channels = ex_conv.out_channels - len(prune_list), kernel_size=ex_conv.kernel_size, stride = ex_conv.stride, padding = ex_conv.padding, dilation = ex_conv.dilation, bias = (ex_conv.bias is not None))  
@@ -136,5 +133,9 @@ def pruning_efficient_net(model,save_name):
     
     pruned_parameters = sum(p.numle() for p in model.parameters() if p.requires_grad) 
     torch.save(model,save_name) 
-    return pruned_parameters
+    return pruned_parameters/original_parameters
 
+#load model 
+model = torch.load('trained_model')
+compression_rate = pruning_efficient_net(model, args.save_name)
+print(compression_rate)
