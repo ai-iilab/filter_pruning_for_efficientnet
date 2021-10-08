@@ -36,3 +36,11 @@ class basicblock(nn.Module):
             
     def forward(self, x):
         return nn.ReLU(inplace=True)(self.residual_function(x) + self.shortcut(x))
+    
+class bottleneck(nn.Module):
+    """Residual block for Resnet over 50 layers
+
+    """
+    expansion = 4
+    def __init__(self, in_channels, out_channels, stride=1):
+        super().__init__()
