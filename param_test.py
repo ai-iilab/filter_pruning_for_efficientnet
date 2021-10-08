@@ -32,3 +32,6 @@ def get_conv_list_res1(model):
                         if isinstance(model._modules[key1]._modules[key2]._modules[key3]._modules[key4],torch.nn.modules.conv.Conv2d) or isinstance(model._modules[key1]._modules[key2]._modules[key3]._modules[key4],torch.nn.BatchNorm2d):
                             list.append([key1, key2, key3, key4])
     return list
+
+
+#original_model = torch.load("")
