@@ -43,7 +43,7 @@ def test_quantize_k_means_fix_zeros():
         assert v in centers_
     assert param.masked_select(mask).eq(0).all()
 
-    
+
 def test_quantized_fixed_point():
     param = torch.rand(128, 64, 3, 3) - 0.5
     mask = prune_vanilla_elementwise(sparsity=0.4, param=param)
