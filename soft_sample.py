@@ -1,0 +1,68 @@
+import torch
+
+from train import train_step
+from vgg import MyVGG
+from optimizer import get_optimizer
+from hardprune import hard_prune_vgg_step
+from utils import get_data_set
+
+
+def soft_prune_network(network, args):
+    if args.network == 'vgg':
+        network = soft_prune_vgg(network, args)
+    elif args.network == 'resnet':
+        network = soft_prune_resnet(network, args)
+    return network
+
+
+def soft_prune_vgg(network, args):
+    if network is None:
+        if args.network == 'vgg':
+            network = MyVGG()
+
+    layers = []
+    channels = []
+    num = 1
+
+    # for i in range(len(network.features)):
+    #     if isinstance(network.features[i], torch.nn.Conv2d):
+    #         layers.append('conv' + str(num))
+    #         channels.append(int(round(network.features[i].out_channels * args.prune_rate[0])))
+    #         num += 1
+    layers = ['conv1', 'conv8', 'conv9', 'conv10', 'conv11', 'conv12', 'conv13']
+    channels = [32, 256, 256, 256, 256, 256, 256]
+
+    network = soft_train(network, args)
+    network = hard_prune_vgg_step(network, layers, channels, args.independent_prune_flag)
+
+    print("-*-" * 10 + "\n\t\tPrune network\n" + "-*-" * 10)
+    print(network)
+
+    return network
+
+
+def soft_train(network, args):
+    device = torch.device("cuda" if args.gpu_flag is True else "cpu")
+    optimizer, scheduler = get_optimizer(network, args)
+
+    train_data_set = get_data_set(args, train_flag=True)
+    test_data_set = get_data_set(args, train_flag=False)
+    train_data_loader = torch.utils.data.DataLoader(train_data_set, batch_size=args.batch_size, shuffle=True)
+    test_data_loader = torch.utils.data.DataLoader(test_data_set, batch_size=args.batch_size, shuffle=False)
+
+    print("-*-" * 10 + "\n\t\tTrain network\n" + "-*-" * 10)
+    for epoch in range(0, args.epoch):
+        network = network.cpu()
+        if args.network is "vgg":
+            network = soft_prune_vgg_step(network, args.prune_rate[0])
+        elif args.network == 'resnet':
+            network = soft_prune_resnet_step(network, args.prune_rate)
+        network = network.to(device)
+        train_step(network, train_data_loader, test_data_loader, optimizer, device, epoch)
+        if scheduler is not None:
+            scheduler.step()
+
+    return network
+
+
+
