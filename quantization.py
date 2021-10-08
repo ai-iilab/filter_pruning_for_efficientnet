@@ -82,3 +82,22 @@ def test_quantizer():
             for v in vals:
                 assert v in centers_
             assert p.data.masked_select(mask_dict[n]).eq(0).all
+
+    state_dict = quantizer.state_dict()
+    quantizer = Quantizer().load_state_dict(state_dict)
+    model = torch.nn.Sequential(torch.nn.Conv2d(256, 128, 3, bias=True),
+                                torch.nn.Conv2d(128, 512, 1, bias=False))
+    mask_dict = {}
+    for n, p in model.named_parameters():
+        mask_dict[n] = prune_vanilla_elementwise(sparsity=0.4, param=p)
+    quantizer.quantize(model, update_labels=True, verbose=True)
+    for n, p in model.named_parameters():
+        if n in rule_dict:
+            vals = set(p.data.view(p.numel()).tolist())
+            if rule_dict[n][0] == 'k-means':
+                centers_ = quantizer.codebooks[n].cluster_centers_.view(rule_dict[n][1]).tolist()
+            else:
+                centers_ = quantizer.codebooks[n]['cluster_centers_']
+            for v in vals:
+                assert v in centers_
+            assert p.data.masked_select(mask_dict[n]).eq(0).all
