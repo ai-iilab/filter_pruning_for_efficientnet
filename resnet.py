@@ -54,3 +54,11 @@ class bottleneck(nn.Module):
             nn.Conv2d(out_channels, out_channels * bottleneck.expansion, kernel_size=1, bias=False),
             nn.BatchNorm2d(out_channels * bottleneck.expansion),
         )
+        
+        self.shortcut = nn.Sequential()
+
+        if stride != 1 or in_channels != out_channels * bottleneck.expansion:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels * bottleneck.expansion, stride=stride, kernel_size=1, bias=False),
+                nn.BatchNorm2d(out_channels * bottleneck.expansion)
+            )
