@@ -50,3 +50,17 @@ def test_vanilla_pruner():
     pruner = VanillaPruner().load_state_dict(state_dict)
     model = torch.nn.Sequential(torch.nn.Conv2d(256, 128, 3, bias=True),
                                 torch.nn.Conv2d(128, 512, 1, bias=False))
+    
+    
+        pruner.prune(model=model, stage=0)
+    for n, param in model.named_parameters():
+        if param.dim() > 1:
+            mask = pruner.masks[n]
+            assert mask.sum() == int(math.ceil(param.numel() * rule_dict[n][0]))
+            assert param.data.masked_select(mask).eq(0).all()
+    pruner.prune(model=model, stage=1, update_masks=True, verbose=True)
+    for n, param in model.named_parameters():
+        if param.dim() > 1:
+            mask = pruner.masks[n]
+            assert mask.sum() == int(math.ceil(param.numel() * rule_dict[n][1]))
+            assert param.data.masked_select(mask).eq(0).all()
