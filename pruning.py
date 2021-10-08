@@ -34,4 +34,16 @@ print(model)
 
 prune.random_unstructured(module, name="weight", amount=0.3)
 
+class FooBarPruningMethod(prune.BasePruningMethod):
+    """Prune every other entry in a tensor
+    """
+    PRUNING_TYPE = 'unstructured'
+
+    def compute_mask(self, t, default_mask):
+        mask = default_mask.clone()
+        mask.view(-1)[::2] = 0
+        return mask
+
+    #  To implement your own pruning function, you can extend nn.utils.prune module by subclassing the BasePruningMethod base class, the same way all other pruning methods do.
+
 # To prune a module, first select a pruning technique among those available in torch.nn.utils.prune (or implement your own by subclassing)
