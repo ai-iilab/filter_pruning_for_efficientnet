@@ -131,7 +131,10 @@ def Resnet101():
     """
     return Resnet(bottleneck, [3, 4, 23, 3])
 
-
+def Resnet152():
+    """ return a Resnet 152 object
+    """
+    return Resnet(bottleneck, [3, 8, 36, 3])
 
 
 
