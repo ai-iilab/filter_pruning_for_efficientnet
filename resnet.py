@@ -108,3 +108,17 @@ class Resnet(nn.Module):
         output = self.fc(output)
 
         return output
+
+def Resnet18():
+    """ return a Resnet 18 object
+    """
+    return Resnet(basicblock, [2, 2, 2, 2])
+
+
+
+
+
+
+
+
+    
