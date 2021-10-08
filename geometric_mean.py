@@ -243,6 +243,29 @@ class Mask:
                     print(self.mask_index)
             else:
                 pass
+            
+            
+    def init_mask(self, rate_norm_per_layer, rate_dist_per_layer):
+        self.init_rate(rate_norm_per_layer, rate_dist_per_layer)
+        for index, item in enumerate(self.model.parameters()):
+            if index in self.mask_index:
+                # mask for norm criterion
+                self.mat[index] = self.get_filter_codebook(item.data, self.compress_rate[index],
+                                                           self.model_length[index])
+                self.mat[index] = self.convert2tensor(self.mat[index])
+                if args.use_cuda:
+                    self.mat[index] = self.mat[index].cuda()
+
+                # mask for distance criterion
+                self.similar_matrix[index] = self.get_filter_similar(item.data, self.compress_rate[index],
+                                                                     self.distance_rate[index],
+                                                                     self.model_length[index])
+                self.similar_matrix[index] = self.convert2tensor(self.similar_matrix[index])
+                if args.use_cuda:
+                    self.similar_matrix[index] = self.similar_matrix[index].cuda()
+        print("mask Ready")
+
+
 
 
 
