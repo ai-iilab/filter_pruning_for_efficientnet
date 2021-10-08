@@ -2,15 +2,8 @@
 import torch
 
 def weight_reconstruction(next_module, next_input_feature, next_output_feature, cpu=True):
-    """
-    reconstruct the weight of the next layer to the one being pruned
-    :param next_module: torch.nn.module, module of the next layer to the one being pruned
-    :param next_input_feature: torch.(cuda.)Tensor, new input feature map of the next layer
-    :param next_output_feature: torch.(cuda.)Tensor, original output feature map of the next layer
-    :param cpu: bool, whether done in cpu
-    :return:
-        void
-    """
+
+    
     if next_module.bias is not None:
         bias_size = [1] * next_output_feature.dim()
         bias_size[1] = -1
