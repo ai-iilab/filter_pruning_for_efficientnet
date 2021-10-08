@@ -140,7 +140,9 @@ def Resnet152():
 def test():
     net = Resnet50()
     y = net(torch.randn(1, 3, 64, 64))
+    print(y.size())
 
+test()
 
 
 
