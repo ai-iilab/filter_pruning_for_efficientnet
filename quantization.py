@@ -6,6 +6,29 @@ from slender.quantize.kmeans import quantize_k_means, quantize_k_means_fix_zeros
 from slender.quantize.fixed_point import quantize_fixed_point
 from slender.quantize.quantizer import Quantizer
 
+
+def test_quantize_linear():
+    param = torch.rand(128, 64, 3, 3) - 0.5
+    codebook = quantize_linear(param, k=16)
+    assert codebook['cluster_centers_'].numel() == 16
+    centers_ = codebook['cluster_centers_'].tolist()
+    vals = set(param.view(param.numel()).tolist())
+    for v in vals:
+        assert v in centers_
+
+
+def test_quantize_linear_fix_zeros():
+    param = torch.rand(128, 64, 3, 3) - 0.5
+    mask = prune_vanilla_elementwise(sparsity=0.4, param=param)
+    codebook = quantize_linear_fix_zeros(param, k=16)
+    assert codebook['cluster_centers_'].numel() == 16
+    centers_ = codebook['cluster_centers_'].tolist()
+    vals = set(param.view(param.numel()).tolist())
+    for v in vals:
+        assert v in centers_
+    assert param.masked_select(mask).eq(0).all()
+
+
 def test_quantize_k_means():
     param = torch.rand(128, 64, 3, 3) - 0.5
     codebook = quantize_k_means(param, k=16)
@@ -72,25 +95,6 @@ def test_quantizer():
         mask_dict[n] = prune_vanilla_elementwise(sparsity=0.4, param=p)
     quantizer = Quantizer(rule=rule, fix_zeros=True)
     quantizer.quantize(model, update_labels=False, verbose=True)
-    for n, p in model.named_parameters():
-        if n in rule_dict:
-            vals = set(p.data.view(p.numel()).tolist())
-            if rule_dict[n][0] == 'k-means':
-                centers_ = quantizer.codebooks[n].cluster_centers_.view(rule_dict[n][1]).tolist()
-            else:
-                centers_ = quantizer.codebooks[n]['cluster_centers_']
-            for v in vals:
-                assert v in centers_
-            assert p.data.masked_select(mask_dict[n]).eq(0).all
-
-    state_dict = quantizer.state_dict()
-    quantizer = Quantizer().load_state_dict(state_dict)
-    model = torch.nn.Sequential(torch.nn.Conv2d(256, 128, 3, bias=True),
-                                torch.nn.Conv2d(128, 512, 1, bias=False))
-    mask_dict = {}
-    for n, p in model.named_parameters():
-        mask_dict[n] = prune_vanilla_elementwise(sparsity=0.4, param=p)
-    quantizer.quantize(model, update_labels=True, verbose=True)
     for n, p in model.named_parameters():
         if n in rule_dict:
             vals = set(p.data.view(p.numel()).tolist())
