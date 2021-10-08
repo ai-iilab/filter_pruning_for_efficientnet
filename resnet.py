@@ -27,3 +27,9 @@ class basicblock(nn.Module):
 
         #shortcut
         self.shortcut = nn.Sequential()
+        
+        if stride != 1 or in_channels != basicblock.expansion * out_channels:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels * basicblock.expansion, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(out_channels * basicblock.expansion)
+            )
