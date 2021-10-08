@@ -64,5 +64,23 @@ def soft_train(network, args):
 
     return network
 
+def soft_prune_vgg_step(network, prune_rate):
+    for i in range(len(network.features)):
+        if isinstance(network.features[i], torch.nn.Conv2d) and (i == 0 or network.features[i].out_channels == 512):
+            kernel = network.features[i].weight.data
+            sum_of_kernel = torch.sum(torch.abs(kernel.view(kernel.size(0), -1)), dim=1)
+            _, args = torch.sort(sum_of_kernel)
+            soft_prune_list = args[:int(round(kernel.size(0) * prune_rate))].tolist()
+            for j in soft_prune_list:
+                network.features[i].weight.data[j] = torch.zeros_like(network.features[i].weight.data[j])
+                network.features[i].bias.data[j] = torch.zeros_like(network.features[i].bias.data[j])
+    return network
 
+
+def soft_prune_resnet(network, args):
+    return network
+
+
+def soft_prune_resnet_step(network, prune_rate):
+    return network
 
