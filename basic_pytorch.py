@@ -80,3 +80,11 @@ for epoch in range(epochs):
     a2 = x_.matmul(w1)
     a2 = a2.add(b1)
     print(a2.grad, a2.grad_fn, a2)
+    
+
+class Linear(Module):
+  def __init__(self, in_features, out_features, bias):
+    super(Linear, sefl).__init__()
+    self.in_features = in_features
+    self.out_features = out_features
+    self.weight = Parameter(torch.Tensor(out_features, in_features)
