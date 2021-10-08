@@ -137,9 +137,6 @@ def get_numpy_data(input_size=10, limit=1000):
       y.append([0,1,0,0])
   return training_test_gen(np.array(x), np.array(x))
 
-"""
-The endoer function encodes the input to binary number, which makes it easy for the neural network to learn.
-"""
 
 epochs = 500
 batches = 64
