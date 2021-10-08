@@ -294,7 +294,14 @@ class Mask:
         # print("grad zero Done")
 
 
-
-
    
-   
+       def if_zero(self):
+        for index, item in enumerate(self.model.parameters()):
+            if index in self.mask_index:
+                # if index in [x for x in range(args.layer_begin, args.layer_end + 1, args.layer_inter)]:
+                a = item.data.view(self.model_length[index])
+                b = a.cpu().numpy()
+
+                print("layer: %d, number of nonzero weight is %d, zero is %d" % (
+                    index, np.count_nonzero(b), len(b) - np.count_nonzero(b)))
+
