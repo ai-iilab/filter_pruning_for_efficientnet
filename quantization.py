@@ -54,3 +54,31 @@ def test_quantized_fixed_point():
     for v in vals:
         assert v in centers_
     assert param.masked_select(mask).eq(0).all()
+
+
+def test_quantizer():
+    rule = [
+        ('0.weight', 'k-means', 4, 'k-means++'),
+        ('1.weight', 'fixed_point', 6, 1),
+    ]
+    rule_dict = {
+        '0.weight': ['k-means', 16],
+        '1.weight': ['fixed_point', 6, 1]
+    }
+    model = torch.nn.Sequential(torch.nn.Conv2d(256, 128, 3, bias=True),
+                                torch.nn.Conv2d(128, 512, 1, bias=False))
+    mask_dict = {}
+    for n, p in model.named_parameters():
+        mask_dict[n] = prune_vanilla_elementwise(sparsity=0.4, param=p)
+    quantizer = Quantizer(rule=rule, fix_zeros=True)
+    quantizer.quantize(model, update_labels=False, verbose=True)
+    for n, p in model.named_parameters():
+        if n in rule_dict:
+            vals = set(p.data.view(p.numel()).tolist())
+            if rule_dict[n][0] == 'k-means':
+                centers_ = quantizer.codebooks[n].cluster_centers_.view(rule_dict[n][1]).tolist()
+            else:
+                centers_ = quantizer.codebooks[n]['cluster_centers_']
+            for v in vals:
+                assert v in centers_
+            assert p.data.masked_select(mask_dict[n]).eq(0).all
