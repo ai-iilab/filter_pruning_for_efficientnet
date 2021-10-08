@@ -260,6 +260,28 @@ def EVBMF(Y, sigma2=None, H=None):
 
     return U[:,:pos], np.diag(d), V[:,:pos], post
 
+def EVBsigma2(sigma2,L,M,s,residual,xubar):
+    H = len(s)
+
+    alpha = L/M
+    x = s**2/(M*sigma2)
+
+    z1 = x[x>xubar]
+    z2 = x[x<=xubar]
+    tau_z1 = tau(z1, alpha)
+
+    term1 = np.sum(z2 - np.log(z2))
+    term2 = np.sum(z1 - tau_z1)
+    term3 = np.sum( np.log( np.divide(tau_z1+1, z1)))
+    term4 = alpha*np.sum(np.log(tau_z1/alpha+1))
+
+    obj = term1+term2+term3+term4+ residual/(M*sigma2) + (L-H)*np.log(sigma2)
+
+    return obj
+
+
+
+
 def cp_decomposition_conv_layer(layer, rank):
     """ Gets a conv layer and a target rank, 
         returns a nn.Sequential object with the decomposition """
