@@ -41,6 +41,33 @@ def test_encode_param():
     print(stats)
     assert torch.eq(param, fixed_point.data).all()
 
+    
+    def test_codec():
+    quantize_rule = [
+        ('0.weight', 'k-means', 4, 'k-means++'),
+        ('1.weight', 'fixed_point', 6, 1),
+    ]
+    model = torch.nn.Sequential(torch.nn.Conv2d(256, 128, 3, bias=True),
+                                torch.nn.Conv2d(128, 512, 1, bias=False))
+    mask_dict = {}
+    for n, p in model.named_parameters():
+        mask_dict[n] = prune_vanilla_elementwise(sparsity=0.6, param=p.data)
+    quantizer = Quantizer(rule=quantize_rule, fix_zeros=True)
+    quantizer.quantize(model, update_labels=False, verbose=True)
+    rule = [
+        ('0.weight', 'huffman', 0, 0, 4),
+        ('1.weight', 'fixed_point', 6, 1, 4)
+    ]
+    codec = Codec(rule=rule)
+    encoded_module = codec.encode(model)
+    print(codec.stats)
+    state_dict = encoded_module.state_dict()
+    model_2 = torch.nn.Sequential(torch.nn.Conv2d(256, 128, 3, bias=True),
+                                  torch.nn.Conv2d(128, 512, 1, bias=False))
+    model_2 = Codec.decode(model_2, state_dict)
+    for p1, p2 in zip(model.parameters(), model_2.parameters()):
+        if p1.dim() > 1:
+            assert torch.eq(p1, p2).all()
 
 def test_prune_vanilla_elementwise():
     param = torch.rand(64, 128, 3, 3)
