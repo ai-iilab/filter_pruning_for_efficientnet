@@ -5,6 +5,43 @@ from slender.prune.vanilla import prune_vanilla_elementwise, prune_vanilla_kerne
     prune_vanilla_filterwise, VanillaPruner
 
 
+import torch
+
+from slender.prune.vanilla import prune_vanilla_elementwise
+from slender.quantize.linear import quantize_linear_fix_zeros
+from slender.quantize.fixed_point import quantize_fixed_point
+from slender.quantize.quantizer import Quantizer
+from slender.coding.encode import EncodedParam
+from slender.coding.codec import Codec
+
+
+def test_encode_param():
+    param = torch.rand(256, 128, 3, 3)
+    prune_vanilla_elementwise(sparsity=0.7, param=param)
+    quantize_linear_fix_zeros(param, k=16)
+    huffman = EncodedParam(param=param, method='huffman',
+                           encode_indices=True, bit_length_zero_run_length=4)
+    stats = huffman.stats
+    print(stats)
+    assert torch.eq(param, huffman.data).all()
+    state_dict = huffman.state_dict()
+    huffman = EncodedParam()
+    huffman.load_state_dict(state_dict)
+    assert torch.eq(param, huffman.data).all()
+    vanilla = EncodedParam(param=param, method='vanilla',
+                           encode_indices=True, bit_length_zero_run_length=4)
+    stats = vanilla.stats
+    print(stats)
+    assert torch.eq(param, vanilla.data).all()
+    quantize_fixed_point(param=param, bit_length=4, bit_length_integer=0)
+    fixed_point = EncodedParam(param=param, method='fixed_point',
+                               bit_length=4, bit_length_integer=0,
+                               encode_indices=True, bit_length_zero_run_length=4)
+    stats = fixed_point.stats
+    print(stats)
+    assert torch.eq(param, fixed_point.data).all()
+
+
 def test_prune_vanilla_elementwise():
     param = torch.rand(64, 128, 3, 3)
     mask = prune_vanilla_elementwise(sparsity=0.3, param=param)
