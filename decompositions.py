@@ -3,7 +3,39 @@ from tensorly.decomposition import parafac, partial_tucker
 import numpy as np
 import torch
 import torch.nn as nn
-from VBMF import VBMF
+
+
+def VBsigma2(sigma2,L,M,cacb,s,residual):
+    H = len(s)
+
+    thresh_term = (L+M + sigma2/cacb**2)/2
+    threshold = np.sqrt( sigma2 * (thresh_term + np.sqrt(thresh_term**2 - L*M) ))
+    pos = np.sum(s>threshold)
+
+    d = np.multiply(s[:pos],
+                    1 - np.multiply(sigma2/(2*s[:pos]**2),
+                                    L+M+np.sqrt( (M-L)**2 + 4*s[:pos]**2/cacb**2 )))
+
+    zeta = sigma2/(2*L*M) * (L+M+sigma2/cacb**2 - np.sqrt((L+M+sigma2/cacb**2)**2 - 4*L*M))
+    post_ma = np.zeros(H)
+    post_mb = np.zeros(H)
+    post_sa2 = cacb * (1-L*zeta/sigma2) * np.ones(H)
+    post_sb2 = cacb * (1-M*zeta/sigma2) * np.ones(H)
+
+    delta = cacb/sigma2 * (s[:pos]-d- L*sigma2/s[:pos])
+    post_ma[:pos] = np.sqrt(np.multiply(d, delta))
+    post_mb[:pos] = np.sqrt(np.divide(d, delta))
+    post_sa2[:pos] = np.divide(sigma2*delta, s[:pos])
+    post_sb2[:pos] = np.divide(sigma2, np.multiply(delta, s[:pos]))
+
+    F = 0.5*(L*M*np.log(2*np.pi*sigma2) + (residual+np.sum(s**2))/sigma2 - (L+M)*H
+               + np.sum(M*np.log(cacb/post_sa2) + L*np.log(cacb/post_sb2)
+                        + (post_ma**2 + M*post_sa2)/cacb + (post_mb**2 + L*post_sb2)/cacb
+                        + (-2 * np.multiply(np.multiply(post_ma, post_mb), s)
+                           + np.multiply(post_ma**2 + M*post_sa2,post_mb**2 + L*post_sb2))/sigma2))
+    return F
+
+
 
 def cp_decomposition_conv_layer(layer, rank):
     """ Gets a conv layer and a target rank, 
