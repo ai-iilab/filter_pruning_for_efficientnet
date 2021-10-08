@@ -118,4 +118,53 @@ class Mask:
         return codebook
 
     # optimize for fast ccalculation
- 
+    def get_filter_similar(self, weight_torch, compress_rate, distance_rate, length):
+        codebook = np.ones(length)
+        if len(weight_torch.size()) == 4:
+            filter_pruned_num = int(weight_torch.size()[0] * (1 - compress_rate))
+            similar_pruned_num = int(weight_torch.size()[0] * distance_rate)
+            weight_vec = weight_torch.view(weight_torch.size()[0], -1)
+            # norm1 = torch.norm(weight_vec, 1, 1)
+            # norm1_np = norm1.cpu().numpy()
+            norm2 = torch.norm(weight_vec, 2, 1)
+            norm2_np = norm2.cpu().numpy()
+            filter_small_index = []
+            filter_large_index = []
+            filter_large_index = norm2_np.argsort()[filter_pruned_num:]
+            filter_small_index = norm2_np.argsort()[:filter_pruned_num]
+
+            # # distance using pytorch function
+            # similar_matrix = torch.zeros((len(filter_large_index), len(filter_large_index)))
+            # for x1, x2 in enumerate(filter_large_index):
+            #     for y1, y2 in enumerate(filter_large_index):
+            #         # cos = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
+            #         # similar_matrix[x1, y1] = cos(weight_vec[x2].view(1, -1), weight_vec[y2].view(1, -1))[0]
+            #         pdist = torch.nn.PairwiseDistance(p=2)
+            #         similar_matrix[x1, y1] = pdist(weight_vec[x2].view(1, -1), weight_vec[y2].view(1, -1))[0][0]
+            # # more similar with other filter indicates large in the sum of row
+            # similar_sum = torch.sum(torch.abs(similar_matrix), 0).numpy()
+
+            # distance using numpy function
+            indices = torch.LongTensor(filter_large_index).cuda()
+            weight_vec_after_norm = torch.index_select(weight_vec, 0, indices).cpu().numpy()
+            # for euclidean distance
+            similar_matrix = distance.cdist(weight_vec_after_norm, weight_vec_after_norm, 'euclidean')
+            # for cos similarity
+            # similar_matrix = 1 - distance.cdist(weight_vec_after_norm, weight_vec_after_norm, 'cosine')
+            similar_sum = np.sum(np.abs(similar_matrix), axis=0)
+
+            # for distance similar: get the filter index with largest similarity == small distance
+            similar_large_index = similar_sum.argsort()[similar_pruned_num:]
+            similar_small_index = similar_sum.argsort()[:  similar_pruned_num]
+            similar_index_for_filter = [filter_large_index[i] for i in similar_small_index]
+
+            kernel_length = weight_torch.size()[1] * weight_torch.size()[2] * weight_torch.size()[3]
+            for x in range(0, len(similar_index_for_filter)):
+                codebook[
+                similar_index_for_filter[x] * kernel_length: (similar_index_for_filter[x] + 1) * kernel_length] = 0
+            print("similar index done")
+        else:
+            pass
+        return codebook
+
+   
