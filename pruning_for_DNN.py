@@ -65,6 +65,39 @@ def test_encode_param():
     stats = fixed_point.stats
     print(stats)
     assert torch.eq(param, fixed_point.data).all()
+    
+     if method == 'greedy':
+        indices_pruned = []
+        while len(indices_pruned) < num_pruned:
+            min_diff = 1e10
+            min_idx = 0
+            for idx in range(num_channel):
+                if idx in indices_pruned:
+                    continue
+                indices_try = indices_pruned + [idx]
+                output_feature_try = torch.zeros_like(output_feature)
+                output_feature_try[:, indices_try, ...] = output_feature[:, indices_try, ...]
+                output_feature_try = fn_next_output_feature(output_feature_try)
+                output_feature_try_norm = output_feature_try.norm(2)
+                if output_feature_try_norm < min_diff:
+                    min_diff = output_feature_try_norm
+                    min_idx = idx
+            indices_pruned.append(min_idx)
+    elif method == 'lasso':
+        next_output_feature = fn_next_output_feature(output_feature)
+        num_el = next_output_feature.numel()
+        next_output_feature = next_output_feature.data.view(num_el).cpu()
+        next_output_feature_divided = []
+        for idx in range(num_channel):
+            output_feature_try = torch.zeros_like(output_feature)
+            output_feature_try[:, idx, ...] = output_feature[:, idx, ...]
+            output_feature_try = fn_next_output_feature(output_feature_try)
+            next_output_feature_divided.append(output_feature_try.data.view(num_el, 1))
+        next_output_feature_divided = torch.cat(next_output_feature_divided, dim=1).cpu()
+
+        alpha = 5e-5
+        solver = Lasso(alpha=alpha, warm_start=True, selection='random')
+
 
     
     def test_codec():
