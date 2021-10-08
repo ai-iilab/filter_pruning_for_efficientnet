@@ -37,3 +37,33 @@ def get_numpy_data(input_size=10, limit=1000):
     elif i % 5 == 0:
       y.append([0,1,0,0])
   return training_test_gen(np.array(x), np.array(x))
+
+"""
+The endoer function encodes the input to binary number, which makes it easy for the neural network to learn.
+"""
+
+epochs = 500
+batches = 64
+lr = 0.01 
+input_size = 10
+output_size = 4
+hidden_size = 100
+
+for i in epoch:
+  network_execution_over_whole_dataset()
+
+"""
+The learning rate decides how fast we eant our network to take feedbak from the error on each iteration.
+It decides what to learn from the current iteration by forgetting what the network learned from all the previous iterations
+"""
+
+#Autograd 
+
+x = torch.from_numpy(trX).type(dtype)
+Y = torch.from_numpy(trY).type(dtype)
+W1 = torch.randn(input_sise, hidden_sie, requires_grad=True).type(dtype)
+W2 = torch.rnadn(hidden_size, output_size, required_grad=True).type(dtype)
+b1 = torch.zeros(1, hidden_size, requires_grad=True).type(dtype)
+b2 = torch.zeros(1, output_size, requires_grad=True).type(dtype)
+
+prind(x.grad x.grad_fn, x)
