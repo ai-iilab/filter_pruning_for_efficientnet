@@ -8,18 +8,7 @@ num_pruned_tolerate_coeff = 1.1
 
 
 def channel_selection(sparsity, output_feature, fn_next_output_feature, method='greedy'):
-    """
-    select channel to prune with a given metric
-    :param sparsity: float, pruning sparsity
-    :param output_feature: torch.(cuda.)Tensor, output feature map of the layer being pruned
-    :param fn_next_output_feature: function, function to calculate the next output feature map
-    :param method: str
-                    'greedy': select one contributed to the smallest next feature after another
-                    'lasso': select pruned channels by lasso regression
-                    'random': randomly select
-    :return:
-        list of int, indices of filters to be pruned
-    """
+
     num_channel = output_feature.size(1)
     num_pruned = int(math.floor(num_channel * sparsity))
 
