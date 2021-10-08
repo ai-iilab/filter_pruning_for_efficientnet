@@ -121,6 +121,10 @@ def Resnet34():
     return Resnet(basicblock, [3, 4, 6, 3])
 
 
+def Resnet50():
+    """ return a Resnet 50 object
+    """
+    return Resnet(bottleneck, [3, 4, 6, 3])
 
 
 
