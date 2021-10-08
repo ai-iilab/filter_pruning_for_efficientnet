@@ -1,9 +1,145 @@
-
+import math
+import random
 import torch
+from sklearn.linear_model import Lasso
+
+
+num_pruned_tolerate_coeff = 1.1
+
+
+def channel_selection(sparsity, output_feature, fn_next_output_feature, method='greedy'):
+    """
+    select channel to prune with a given metric
+    :param sparsity: float, pruning sparsity
+    :param output_feature: torch.(cuda.)Tensor, output feature map of the layer being pruned
+    :param fn_next_output_feature: function, function to calculate the next output feature map
+    :param method: str
+                    'greedy': select one contributed to the smallest next feature after another
+                    'lasso': select pruned channels by lasso regression
+                    'random': randomly select
+    :return:
+        list of int, indices of filters to be pruned
+    """
+    num_channel = output_feature.size(1)
+    num_pruned = int(math.floor(num_channel * sparsity))
+
+    if method == 'greedy':
+        indices_pruned = []
+        while len(indices_pruned) < num_pruned:
+            min_diff = 1e10
+            min_idx = 0
+            for idx in range(num_channel):
+                if idx in indices_pruned:
+                    continue
+                indices_try = indices_pruned + [idx]
+                output_feature_try = torch.zeros_like(output_feature)
+                output_feature_try[:, indices_try, ...] = output_feature[:, indices_try, ...]
+                output_feature_try = fn_next_output_feature(output_feature_try)
+                output_feature_try_norm = output_feature_try.norm(2)
+                if output_feature_try_norm < min_diff:
+                    min_diff = output_feature_try_norm
+                    min_idx = idx
+            indices_pruned.append(min_idx)
+    elif method == 'lasso':
+        next_output_feature = fn_next_output_feature(output_feature)
+        num_el = next_output_feature.numel()
+        next_output_feature = next_output_feature.data.view(num_el).cpu()
+        next_output_feature_divided = []
+        for idx in range(num_channel):
+            output_feature_try = torch.zeros_like(output_feature)
+            output_feature_try[:, idx, ...] = output_feature[:, idx, ...]
+            output_feature_try = fn_next_output_feature(output_feature_try)
+            next_output_feature_divided.append(output_feature_try.data.view(num_el, 1))
+        next_output_feature_divided = torch.cat(next_output_feature_divided, dim=1).cpu()
+
+        alpha = 5e-5
+        solver = Lasso(alpha=alpha, warm_start=True, selection='random')
+
+        # first, try to find a alpha that provides enough pruned channels
+        alpha_l, alpha_r = 0, alpha
+        num_pruned_try = 0
+        while num_pruned_try < num_pruned:
+            alpha_r *= 2
+            solver.alpha = alpha_r
+            solver.fit(next_output_feature_divided, next_output_feature)
+            num_pruned_try = sum(solver.coef_ == 0)
+
+        # then, narrow down alpha to get more close to the desired number of pruned channels
+        num_pruned_max = int(num_pruned * num_pruned_tolerate_coeff)
+        while True:
+            alpha = (alpha_l + alpha_r) / 2
+            solver.alpha = alpha
+            solver.fit(next_output_feature_divided, next_output_feature)
+            num_pruned_try = sum(solver.coef_ == 0)
+            if num_pruned_try > num_pruned_max:
+                alpha_r = alpha
+            elif num_pruned_try < num_pruned:
+                alpha_l = alpha
+            else:
+                break
+
+        # finally, convert lasso coeff to indices
+        indices_pruned = solver.coef_.nonzero()[0].tolist()
+    elif method == 'random':
+        indices_pruned = random.sample(range(num_channel), num_pruned)
+    else:
+        raise NotImplementedError
+
+    return indices_pruned
+
+
+def module_surgery(module, next_module, indices_pruned):
+    """
+    prune the redundant filters/channels
+    :param module: torch.nn.module, module of the layer being pruned
+    :param next_module: torch.nn.module, module of the next layer to the one being pruned
+    :param indices_pruned: list of int, indices of filters/channels to be pruned
+    :return:
+        void
+    """
+    # operate module
+    if isinstance(module, torch.nn.modules.conv._ConvNd):
+        indices_stayed = list(set(range(module.out_channels)) - set(indices_pruned))
+        num_channels_stayed = len(indices_stayed)
+        module.out_channels = num_channels_stayed
+    elif isinstance(module, torch.nn.Linear):
+        indices_stayed = list(set(range(module.out_features)) - set(indices_pruned))
+        num_channels_stayed = len(indices_stayed)
+        module.out_features = num_channels_stayed
+    else:
+        raise NotImplementedError
+    # operate module weight
+    new_weight = module.weight[indices_stayed, ...].clone()
+    del module.weight
+    module.weight = torch.nn.Parameter(new_weight)
+    # operate module bias
+    if module.bias is not None:
+        new_bias = module.bias[indices_stayed, ...].clone()
+        del module.bias
+        module.bias = torch.nn.Parameter(new_bias)
+    # operate next_module
+    if isinstance(next_module, torch.nn.modules.conv._ConvNd):
+        next_module.in_channels = num_channels_stayed
+    elif isinstance(next_module, torch.nn.Linear):
+        next_module.in_features = num_channels_stayed
+    else:
+        raise NotImplementedError
+    # operate next_module weight
+    new_weight = next_module.weight[:, indices_stayed, ...].clone()
+    del next_module.weight
+    next_module.weight = torch.nn.Parameter(new_weight)
+
 
 def weight_reconstruction(next_module, next_input_feature, next_output_feature, cpu=True):
-
-    
+    """
+    reconstruct the weight of the next layer to the one being pruned
+    :param next_module: torch.nn.module, module of the next layer to the one being pruned
+    :param next_input_feature: torch.(cuda.)Tensor, new input feature map of the next layer
+    :param next_output_feature: torch.(cuda.)Tensor, original output feature map of the next layer
+    :param cpu: bool, whether done in cpu
+    :return:
+        void
+    """
     if next_module.bias is not None:
         bias_size = [1] * next_output_feature.dim()
         bias_size[1] = -1
@@ -31,156 +167,37 @@ def weight_reconstruction(next_module, next_input_feature, next_output_feature, 
     if isinstance(next_module, torch.nn.modules.conv._ConvNd):
         param = param.view(next_module.out_channels, next_module.in_channels, *next_module.kernel_size)
     del next_module.weight
-    next_module.weight = torch.nn.Parameter(param
-
-from slender.prune.vanilla import prune_vanilla_elementwise
-from slender.quantize.linear import quantize_linear, quantize_linear_fix_zeros
-from slender.quantize.kmeans import quantize_k_means, quantize_k_means_fix_zeros
-from slender.quantize.fixed_point import quantize_fixed_point
-from slender.quantize.quantizer import Quantizer
+    next_module.weight = torch.nn.Parameter(param)
 
 
-def test_quantize_linear():
-    param = torch.rand(128, 64, 3, 3) - 0.5
-    codebook = quantize_linear(param, k=16)
-    assert codebook['cluster_centers_'].numel() == 16
-    centers_ = codebook['cluster_centers_'].tolist()
-    vals = set(param.view(param.numel()).tolist())
-    for v in vals:
-        assert v in centers_
+def prune_channel(sparsity, module, next_module, fn_next_input_feature, input_feature, method='greedy', cpu=True):
+    """
+    channel pruning core function
+    :param sparsity: float, pruning sparsity
+    :param module: torch.nn.module, module of the layer being pruned
+    :param next_module: torch.nn.module, module of the next layer to the one being pruned
+    :param fn_next_input_feature: function, function to calculate the input feature map for next_module
+    :param input_feature: torch.(cuda.)Tensor, input feature map of the layer being pruned
+    :param method: str
+        'greedy': select one contributed to the smallest next feature after another
+        'lasso': pruned channels by lasso regression
+        'random': randomly select
+    :param cpu: bool, whether done in cpu for larger reconstruction batch size
+    :return:
+        void
+    """
+    assert input_feature.dim() >= 2  # N x C x ...
+    output_feature = module(input_feature)
+    next_input_feature = fn_next_input_feature(output_feature)
+    next_output_feature = next_module(next_input_feature)
 
+    def fn_next_output_feature(feature):
+        return next_module(fn_next_input_feature(feature))
 
-from slender.prune.vanilla import prune_vanilla_elementwise, prune_vanilla_kernelwise, \
-    prune_vanilla_filterwise, VanillaPruner
+    indices_pruned = channel_selection(sparsity=sparsity, output_feature=output_feature,
+                                       fn_next_output_feature=fn_next_output_feature, method=method)
+    module_surgery(module=module, next_module=next_module, indices_pruned=indices_pruned)
 
-
-def test_prune_vanilla_elementwise():
-    param = torch.rand(64, 128, 3, 3)
-    mask = prune_vanilla_elementwise(sparsity=0.3, param=param)
-    assert mask.sum() == int(math.ceil(param.numel() * 0.3))
-    assert param.masked_select(mask).eq(0).all()
-    mask = prune_vanilla_elementwise(sparsity=0.7, param=param)
-    assert mask.sum() == int(math.ceil(param.numel() * 0.7))
-    assert param.masked_select(mask).eq(0).all()
-
-
-
-def test_prune_vanilla_filterwise():
-    param = torch.rand(64, 128, 3, 3)
-    mask = prune_vanilla_filterwise(sparsity=0.5, param=param)
-    mask_s = mask.view(64, -1).all(1).sum()
-    assert mask_s == 32
-    assert param.masked_select(mask).eq(0).all()
-
-
-def test_vanilla_pruner():
-    rule = [
-        ('0.weight', 'element', [0.3, 0.5]),
-        ('1.weight', 'element', [0.4, 0.6])
-    ]
-    rule_dict = {
-        '0.weight': [0.3, 0.5],
-        '1.weight': [0.4, 0.6]
-    }
-    model = torch.nn.Sequential(torch.nn.Conv2d(256, 128, 3, bias=True),
-                                torch.nn.Conv2d(128, 512, 1, bias=False))
-    pruner = VanillaPruner(rule=rule)
-    pruner.prune(model=model, stage=0, verbose=True)
-    for n, param in model.named_parameters():
-        if param.dim() > 1:
-            mask = pruner.masks[n]
-            assert mask.sum() == int(math.ceil(param.numel() * rule_dict[n][0]))
-            assert param.data.masked_select(mask).eq(0).all()
-    state_dict = pruner.state_dict()
-    pruner = VanillaPruner().load_state_dict(state_dict)
-    model = torch.nn.Sequential(torch.nn.Conv2d(256, 128, 3, bias=True),
-                                torch.nn.Conv2d(128, 512, 1, bias=False))
-    pruner.prune(model=model, stage=0)
-    rule = [
-        ('0.weight', 'element', [0.3, 0.5]),
-        ('1.weight', 'element', [0.4, 0.6])
-    ]
-    rule_dict = {
-        '0.weight': [0.3, 0.5],
-
-
-x = torch.rankd(2,3,4)
-x_with_2n3_dimensions = x[1,:,:] 
-scalar_x = x[1,1,1]
-
-#numpy like slicing 
-x = torch.rand(2,3)
-print(x[:,1:]) #skipping first column
-
-"""
-A Simple Neural Network
-
-Learning the PyTorch way of building a neural network is really important. 
-IT is the most efficient and clean way of writting PyTorch code, and it also helps you to find
-tutorials and sample snippets easy to follow, since they have the same structure
-"""
-
-def binary_encoder(input_size):
-  def wrapper(num):
-    ret = [int(i) for i in '{0:b}'.format(num)]
-    return [0] * (input_size - len(ret)) + ret
-  
-def get_numpy_data(input_size=10, limit=1000):
-  x = []
-  y = []
-  encoder = binary_encoder(input_size)
-  for i in range(limit):
-    x.append(encoder(i))
-    if i % 15 == 0:
-      y.append([1,0,0,0])
-    elif i % 5 == 0:
-      y.append([0,1,0,0])
-  return training_test_gen(np.array(x), np.array(x))
-
-
-epochs = 500
-batches = 64
-lr = 0.01 
-input_size = 10
-output_size = 4
-hidden_size = 100
-
-for i in epoch:
-  network_execution_over_whole_dataset()
-
-"""
-The learning rate decides how fast we eant our network to take feedbak from the error on each iteration.
-It decides what to learn from the current iteration by forgetting what the network learned from all the previous iterations
-"""
-
-#Autograd 
-
-x = torch.from_numpy(trX).type(dtype)
-Y = torch.from_numpy(trY).type(dtype)
-W1 = torch.randn(input_sise, hidden_sie, requires_grad=True).type(dtype)
-W2 = torch.rnadn(hidden_size, output_size, required_grad=True).type(dtype)
-b1 = torch.zeros(1, hidden_size, requires_grad=True).type(dtype)
-b2 = torch.zeros(1, output_size, requires_grad=True).type(dtype)
-
-prind(x.grad x.grad_fn, x)
-
-
-for epoch in range(epochs):
-  for batch in range(no_of_batches):
-    start = batch * batches
-    end = start + batches
-    x_ = x[start:end]
-    y_ = y[start:end]
-    
-    #build graph
-    a2 = x_.matmul(w1)
-    a2 = a2.add(b1)
-    print(a2.grad, a2.grad_fn, a2)
-    
-
-class Linear(Module):
-  def __init__(self, in_features, out_features, bias):
-    super(Linear, sefl).__init__()
-    self.in_features = in_features
-    self.out_features = out_features
-    self.weight = Parameter(torch.Tensor(out_features, in_features)
+    next_input_feature = fn_next_input_feature(module(input_feature))
+    weight_reconstruction(next_module=next_module, next_input_feature=next_input_feature,
+                          next_output_feature=next_output_feature, cpu=cpu)
