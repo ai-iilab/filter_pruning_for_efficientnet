@@ -1,9 +1,3 @@
-"""
-One of the core philosophes of PyTorch, which came about with the evolution of PyTorch it self, is innteroperability.
-The development teram invested a lot of time into enabling interoperability between different frameworks, such as ONNX, DLPak, and so on. 
-Examples of these will be shown in latyer chapters, but here we will discuss how the internals of PyTorch are designed to accommodate this requirement without
-compromising on speed
-"""
 
 import torch
 
