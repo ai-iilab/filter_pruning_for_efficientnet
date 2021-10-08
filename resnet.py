@@ -65,3 +65,12 @@ class bottleneck(nn.Module):
             
     def forward(self, x):
         return nn.ReLU(inplace=True)(self.residual_function(x) + self.shortcut(x))
+    
+    
+class Resnet(nn.Module):
+
+    def __init__(self, block, num_block, num_classes=200):  # for tiny imagenet class 200
+        super().__init__()
+        
+        
+        
