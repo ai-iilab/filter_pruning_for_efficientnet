@@ -22,6 +22,47 @@ from sklearn.linear_model import Lasso
 
 num_pruned_tolerate_coeff = 1.1
 
+ef module_surgery(module, next_module, indices_pruned):
+    """
+    prune the redundant filters/channels
+    :param module: torch.nn.module, module of the layer being pruned
+    :param next_module: torch.nn.module, module of the next layer to the one being pruned
+    :param indices_pruned: list of int, indices of filters/channels to be pruned
+    :return:
+        void
+    """
+    # operate module
+    if isinstance(module, torch.nn.modules.conv._ConvNd):
+        indices_stayed = list(set(range(module.out_channels)) - set(indices_pruned))
+        num_channels_stayed = len(indices_stayed)
+        module.out_channels = num_channels_stayed
+    elif isinstance(module, torch.nn.Linear):
+        indices_stayed = list(set(range(module.out_features)) - set(indices_pruned))
+        num_channels_stayed = len(indices_stayed)
+        module.out_features = num_channels_stayed
+    else:
+        raise NotImplementedError
+    # operate module weight
+    new_weight = module.weight[indices_stayed, ...].clone()
+    del module.weight
+    module.weight = torch.nn.Parameter(new_weight)
+    # operate module bias
+    if module.bias is not None:
+        new_bias = module.bias[indices_stayed, ...].clone()
+        del module.bias
+        module.bias = torch.nn.Parameter(new_bias)
+    # operate next_module
+    if isinstance(next_module, torch.nn.modules.conv._ConvNd):
+        next_module.in_channels = num_channels_stayed
+    elif isinstance(next_module, torch.nn.Linear):
+        next_module.in_features = num_channels_stayed
+    else:
+        raise NotImplementedError
+    # operate next_module weight
+    new_weight = next_module.weight[:, indices_stayed, ...].clone()
+    del next_module.weight
+    next_module.weight = torch.nn.Parameter(new_weight)
+
 
 def channel_selection(sparsity, output_feature, fn_next_output_feature, method='greedy'):
     """
