@@ -30,3 +30,8 @@ module = model.conv1
 print(list(module.named_parameters()))
 
 print(model)
+
+
+prune.random_unstructured(module, name="weight", amount=0.3)
+
+# To prune a module, first select a pruning technique among those available in torch.nn.utils.prune (or implement your own by subclassing)
