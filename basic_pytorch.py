@@ -7,6 +7,45 @@ compromising on speed
 
 import torch
 
+def weight_reconstruction(next_module, next_input_feature, next_output_feature, cpu=True):
+    """
+    reconstruct the weight of the next layer to the one being pruned
+    :param next_module: torch.nn.module, module of the next layer to the one being pruned
+    :param next_input_feature: torch.(cuda.)Tensor, new input feature map of the next layer
+    :param next_output_feature: torch.(cuda.)Tensor, original output feature map of the next layer
+    :param cpu: bool, whether done in cpu
+    :return:
+        void
+    """
+    if next_module.bias is not None:
+        bias_size = [1] * next_output_feature.dim()
+        bias_size[1] = -1
+        next_output_feature -= next_module.bias.view(bias_size)
+    if cpu:
+        next_input_feature = next_input_feature.cpu()
+    if isinstance(next_module, torch.nn.modules.conv._ConvNd):
+        unfold = torch.nn.Unfold(kernel_size=next_module.kernel_size,
+                                 dilation=next_module.dilation,
+                                 padding=next_module.padding,
+                                 stride=next_module.stride)
+        if not cpu:
+            unfold = unfold.cuda()
+        unfold.eval()
+        next_input_feature = unfold(next_input_feature)
+        next_input_feature = next_input_feature.transpose(1, 2)
+        num_fields = next_input_feature.size(0) * next_input_feature.size(1)
+        next_input_feature = next_input_feature.reshape(num_fields, -1)
+        next_output_feature = next_output_feature.view(next_output_feature.size(0), next_output_feature.size(1), -1)
+        next_output_feature = next_output_feature.transpose(1, 2).reshape(num_fields, -1)
+    if cpu:
+        next_output_feature = next_output_feature.cpu()
+    param, _ = torch.gels(next_output_feature.data, next_input_feature.data)
+    param = param[0:next_input_feature.size(1), :].clone().t().contiguous().view(next_output_feature.size(1), -1)
+    if isinstance(next_module, torch.nn.modules.conv._ConvNd):
+        param = param.view(next_module.out_channels, next_module.in_channels, *next_module.kernel_size)
+    del next_module.weight
+    next_module.weight = torch.nn.Parameter(param
+
 from slender.prune.vanilla import prune_vanilla_elementwise
 from slender.quantize.linear import quantize_linear, quantize_linear_fix_zeros
 from slender.quantize.kmeans import quantize_k_means, quantize_k_means_fix_zeros
