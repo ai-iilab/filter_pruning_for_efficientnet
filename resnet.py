@@ -62,3 +62,6 @@ class bottleneck(nn.Module):
                 nn.Conv2d(in_channels, out_channels * bottleneck.expansion, stride=stride, kernel_size=1, bias=False),
                 nn.BatchNorm2d(out_channels * bottleneck.expansion)
             )
+            
+    def forward(self, x):
+        return nn.ReLU(inplace=True)(self.residual_function(x) + self.shortcut(x))
