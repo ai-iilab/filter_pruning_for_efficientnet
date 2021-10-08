@@ -137,7 +137,9 @@ def Resnet152():
     return Resnet(bottleneck, [3, 8, 36, 3])
 
 
-
+def test():
+    net = Resnet50()
+    y = net(torch.randn(1, 3, 64, 64))
 
 
 
