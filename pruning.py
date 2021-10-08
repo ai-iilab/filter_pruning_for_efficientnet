@@ -25,3 +25,8 @@ class LeNet(nn.Module):
         return x
 
 model = LeNet().to(device=device)
+
+module = model.conv1
+print(list(module.named_parameters()))
+
+print(model)
