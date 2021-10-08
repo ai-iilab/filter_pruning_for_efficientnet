@@ -265,6 +265,33 @@ class Mask:
                     self.similar_matrix[index] = self.similar_matrix[index].cuda()
         print("mask Ready")
 
+        
+    def do_mask(self):
+        for index, item in enumerate(self.model.parameters()):
+            if index in self.mask_index:
+                a = item.data.view(self.model_length[index])
+                b = a * self.mat[index]
+                item.data = b.view(self.model_size[index])
+        print("mask Done")
+
+    def do_similar_mask(self):
+        for index, item in enumerate(self.model.parameters()):
+            if index in self.mask_index:
+                a = item.data.view(self.model_length[index])
+                b = a * self.similar_matrix[index]
+                item.data = b.view(self.model_size[index])
+        print("mask similar Done")
+
+    def do_grad_mask(self):
+        for index, item in enumerate(self.model.parameters()):
+            if index in self.mask_index:
+                a = item.grad.data.view(self.model_length[index])
+                # reverse the mask of model
+                # b = a * (1 - self.mat[index])
+                b = a * self.mat[index]
+                b = b * self.similar_matrix[index]
+                item.grad.data = b.view(self.model_size[index])
+        # print("grad zero Done")
 
 
 
