@@ -166,5 +166,21 @@ class Mask:
         else:
             pass
         return codebook
+     
+    def convert2tensor(self, x):
+        x = torch.FloatTensor(x)
+        return x
 
+    def init_length(self):
+        for index, item in enumerate(self.model.parameters()):
+            self.model_size[index] = item.size()
+
+        for index1 in self.model_size:
+            for index2 in range(0, len(self.model_size[index1])):
+                if index2 == 0:
+                    self.model_length[index1] = self.model_size[index1][0]
+                else:
+                    self.model_length[index1] *= self.model_size[index1][index2]
+
+   
    
