@@ -11,3 +11,19 @@ class basicblock(nn.Module):
     #we use class attribute expansion
     #to distinct
     
+    expansion = 1
+
+    def __init__(self, in_channels, out_channels, stride=1):
+        super().__init__()
+
+        #residual function
+        self.residual_function = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels * basicblock.expansion, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels * basicblock.expansion)
+        )
+
+        #shortcut
+        self.shortcut = nn.Sequential()
