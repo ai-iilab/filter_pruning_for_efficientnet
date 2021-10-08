@@ -35,3 +35,9 @@ def get_conv_list_res1(model):
 
 
 #original_model = torch.load("")
+
+target_model = nn.Sequential(*(list(original_model.children())[:4]), original_model._modules['conv5_x']._modules['0'])
+   
+
+original_params = sum(p.numel() for p in target_model.parameters())
+print('memory: ', original_params)
