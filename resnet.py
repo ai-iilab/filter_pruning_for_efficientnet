@@ -115,7 +115,10 @@ def Resnet18():
     return Resnet(basicblock, [2, 2, 2, 2])
 
 
-
+def Resnet34():
+    """ return a Resnet 34 object
+    """
+    return Resnet(basicblock, [3, 4, 6, 3])
 
 
 
