@@ -14,6 +14,31 @@ from slender.quantize.quantizer import Quantizer
 from slender.coding.encode import EncodedParam
 from slender.coding.codec import Codec
 
+import math
+import random
+import torch
+from sklearn.linear_model import Lasso
+
+
+num_pruned_tolerate_coeff = 1.1
+
+
+def channel_selection(sparsity, output_feature, fn_next_output_feature, method='greedy'):
+    """
+    select channel to prune with a given metric
+    :param sparsity: float, pruning sparsity
+    :param output_feature: torch.(cuda.)Tensor, output feature map of the layer being pruned
+    :param fn_next_output_feature: function, function to calculate the next output feature map
+    :param method: str
+                    'greedy': select one contributed to the smallest next feature after another
+                    'lasso': select pruned channels by lasso regression
+                    'random': randomly select
+    :return:
+        list of int, indices of filters to be pruned
+    """
+    num_channel = output_feature.size(1)
+    num_pruned = int(math.floor(num_channel * sparsity))
+
 
 def test_encode_param():
     param = torch.rand(256, 128, 3, 3)
