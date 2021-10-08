@@ -41,3 +41,9 @@ target_model = nn.Sequential(*(list(original_model.children())[:4]), original_mo
 
 original_params = sum(p.numel() for p in target_model.parameters())
 print('memory: ', original_params)
+
+from fvcore.nn import FlopCountAnalysis, flop_count_table
+
+input = torch.randn(1,3,64,64).half().cuda()
+original_flops = FlopCountAnalysis(target_model.half().cuda(), input)
+print('flops: ', original_flops.total())
