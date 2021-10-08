@@ -33,3 +33,6 @@ class basicblock(nn.Module):
                 nn.Conv2d(in_channels, out_channels * basicblock.expansion, kernel_size=1, stride=stride, bias=False),
                 nn.BatchNorm2d(out_channels * basicblock.expansion)
             )
+            
+    def forward(self, x):
+        return nn.ReLU(inplace=True)(self.residual_function(x) + self.shortcut(x))
