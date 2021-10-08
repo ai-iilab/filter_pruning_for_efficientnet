@@ -67,3 +67,16 @@ b1 = torch.zeros(1, hidden_size, requires_grad=True).type(dtype)
 b2 = torch.zeros(1, output_size, requires_grad=True).type(dtype)
 
 prind(x.grad x.grad_fn, x)
+
+
+for epoch in range(epochs):
+  for batch in range(no_of_batches):
+    start = batch * batches
+    end = start + batches
+    x_ = x[start:end]
+    y_ = y[start:end]
+    
+    #build graph
+    a2 = x_.matmul(w1)
+    a2 = a2.add(b1)
+    print(a2.grad, a2.grad_fn, a2)
