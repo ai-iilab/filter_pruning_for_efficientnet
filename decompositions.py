@@ -381,3 +381,13 @@ def tucker_decomposition_conv_layer(layer):
 
     new_layers = [first_layer, core_layer, last_layer]
     return nn.Sequential(*new_layers)
+
+def phi0(x):
+    return x-np.log(x)
+
+def phi1(x, alpha):
+    return np.log(tau(x,alpha)+1) + alpha*np.log(tau(x,alpha)/alpha + 1) - tau(x,alpha)
+
+def tau(x, alpha):
+    return 0.5 * (x-(1+alpha) + np.sqrt((x-(1+alpha))**2 - 4*alpha))
+
