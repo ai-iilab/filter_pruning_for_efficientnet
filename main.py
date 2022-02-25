@@ -5,6 +5,10 @@ import argparse
 import tensorly  
 import yaml 
 
+from calculate_filter_importance import *
+from model_compression import *
+from pruning_layer import *
+
 parser = argparse.ArgumentParser(description='filter selection for efficient net')
 parser.add_argument('--load', '-l', type=str, default='./target_model.pth')
 parser.add_argument('--save_name', '-n', type=str, default='./pruned_model.pth        
