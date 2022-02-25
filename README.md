@@ -1,2 +1,2 @@
-# filter_pruning_for_efficientnet
-filter selection for EfficientNet
+# EfficientDet 모델 경량화 
+Filter Pruning을 활용한 EfficientDet 모델 경량화 구현
