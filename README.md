@@ -4,7 +4,7 @@
 - "Method and Apparatus for Compression of Convolutional Neural Network Using N-Mode Tensor Product Operation", KR 10-2021-011675, 출원일: 2021 
 
 # Usuage
-python main.py --load "target_CNN_dir" --save_name "pruned_CNN_dir" --comp_ratio "pruning rate [0.0, 0.99]"
+- Compress a trained model: ``python main.py --load "target_CNN_dir" --save_name "pruned_CNN_dir" --comp_ratio "pruning rate [0.0, 0.99]"``
 
 
 # EfficientDet 
