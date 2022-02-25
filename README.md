@@ -5,6 +5,7 @@
 
 # Usuage
 - Compress a trained model: ``python main.py --load "target_CNN_dir" --save_name "pruned_CNN_dir" --comp_ratio "pruning rate [0.0, 0.99]"``
+- tensorly: >= 0.4.5 version; for tensor production; ``pip install -U tensorly``
 
 
 # EfficientDet 
