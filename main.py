@@ -11,7 +11,7 @@ from pruning_layer import *
 
 parser = argparse.ArgumentParser(description='filter selection for efficient net')
 parser.add_argument('--load', '-l', type=str, default='./target_model.pth')
-parser.add_argument('--save_name', '-n', type=str, default='./pruned_model.pth        
+parser.add_argument('--save_name', '-n', type=str, default='./pruned_model.pth')        
 parser.add_argument('--comp_ratio', '-c', type=float, default = '0.5') 
 args = parser.parse_args() 
 
